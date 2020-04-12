@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc, Duration};
-
+use serde_derive::{Deserialize, Serialize};
 use iced::{
     Application, Command, Element, Settings, Subscription,
     executor, scrollable, text_input, button,
@@ -8,9 +8,11 @@ use iced::{
 };
 use iced_native::{Event, input::{self, keyboard}};
 
+
 fn main() {
     MainUi::run(Settings::default())
 }
+
 
 pub mod style {
     pub const SECTION_GAP: u16 = 30;
@@ -19,18 +21,30 @@ pub mod style {
 }
 
 
-enum StoppedReason {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum HowItWasStopped {
     SelfCrashed,
     ManuallyKilled,
 }
 
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Record {
+    #[serde(
+        serialize_with="opt_dt_serde::serialize",
+        deserialize_with="opt_dt_serde::deserialize")]
     frozen: Option<DateTime<Utc>>,
+    #[serde(
+        serialize_with="opt_dt_serde::serialize",
+        deserialize_with="opt_dt_serde::deserialize")]
     busy: Option<DateTime<Utc>>,
     description: String,
-    stopped: StoppedReason,
-    when_stopped: DateTime<Utc>
+    how: HowItWasStopped,
+    #[serde(
+        serialize_with="dt_serde::serialize",
+        deserialize_with="dt_serde::deserialize")]
+    when: DateTime<Utc>,
 }
 
 
@@ -40,17 +54,47 @@ impl Default for Record {
             frozen: None,
             busy: None,
             description: String::new(),
-            stopped: StoppedReason::SelfCrashed,
-            when_stopped: Utc::now(),
+            how: HowItWasStopped::SelfCrashed,
+            when: Utc::now(),
         }
     }
 }
 
+macro_rules! UiElement {
+    () => { Element<<MainUi as Application>::Message> };
+    (for<$lf:lifetime>) => { Element<$lf, <MainUi as Application>::Message> };
+}
+
+macro_rules! UiMessage {
+    () => { <MainUi as Application>::Message };
+}
 
 #[derive(Default)]
 struct MainUi {
-    records: Vec<Record>,
+    data: Option<MainData>,
     ui: MainUiState,
+}
+
+
+#[derive(Debug, Clone)]
+enum LoadError {
+    FileError,
+    FormatError,
+}
+
+
+#[derive(Debug, Clone)]
+enum SaveError {
+    DirectoryError,
+    FileError,
+    WriteError,
+    FormatError,
+}
+
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+struct MainData {
+    records: Vec<Record>,
 }
 
 
@@ -65,7 +109,7 @@ struct MainUiState {
 }
 
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct MainUiEditState {
     record: Record,
     // widgets
@@ -76,10 +120,17 @@ struct MainUiEditState {
 
 
 impl MainUi {
-    fn register_entry(&mut self)
+    fn register_entry(&mut self) -> Command<UiMessage!()>
     {
-        let edit = std::mem::take(&mut self.ui.edit);
-        self.records.push(edit.record);
+        if let Some(ref mut data) = &mut self.data {
+            let edit = std::mem::take(&mut self.ui.edit);
+            data.records.push(edit.record);
+            Command::perform(data.clone().save(), Message::Saved)
+        }
+        else
+        {
+            Command::none()
+        }
     }
 }
 
@@ -87,6 +138,8 @@ impl MainUi {
 
 #[derive(Debug, Clone)]
 enum Message {
+    DataLoaded(Result<MainData, LoadError>),
+    Saved(Result<(), SaveError>),
     Tick(DateTime<Utc>),
     EventOccurred(Event),
     DescriptionEdited(String),
@@ -96,15 +149,6 @@ enum Message {
     KilledClicked,
 }
 
-macro_rules! UiElement {
-    () => { Element<<MainUi as Application>::Message> };
-    (for<$lf:lifetime>) => { Element<$lf, <MainUi as Application>::Message> };
-}
-
-macro_rules! UiMessage {
-    () => { <MainUi as Application>::Message };
-}
-
 
 impl Application for MainUi {
     type Executor = executor::Default;
@@ -112,7 +156,10 @@ impl Application for MainUi {
     type Flags = ();
 
     fn new(_: Self::Flags) -> (Self, Command<Self::Message>) {
-        (Self::default(), Command::none())
+        (
+            Self::default(),
+            Command::perform(MainData::load(), Message::DataLoaded)
+        )
     }
 
     fn title(&self) -> String {
@@ -128,6 +175,14 @@ impl Application for MainUi {
 
     fn update(&mut self, msg: Message) -> Command<Self::Message> {
         match msg {
+            Message::DataLoaded(Ok(data)) => {
+                self.data = Some(data);
+            },
+            Message::DataLoaded(Err(_)) => {
+                self.data = Some(MainData::default());
+            },
+            Message::Saved(_) => {
+            },
             Message::Tick(when) => {
                 self.ui.last_tick = Some(when);
             },
@@ -159,14 +214,14 @@ impl Application for MainUi {
                     else { None };
             },
             Message::Crash5secClicked => {
-                self.ui.edit.record.stopped = StoppedReason::SelfCrashed;
-                self.ui.edit.record.when_stopped = Utc::now();
-                self.register_entry();
+                self.ui.edit.record.how = HowItWasStopped::SelfCrashed;
+                self.ui.edit.record.when = Utc::now();
+                return self.register_entry();
             },
             Message::KilledClicked => {
-                self.ui.edit.record.stopped = StoppedReason::ManuallyKilled;
-                self.ui.edit.record.when_stopped = Utc::now();
-                self.register_entry();
+                self.ui.edit.record.how = HowItWasStopped::ManuallyKilled;
+                self.ui.edit.record.when = Utc::now();
+                return self.register_entry();
             },
         }
 
@@ -233,11 +288,16 @@ impl Application for MainUi {
                                       Message::KilledClicked),
                 ]),
                 Self::make_vspace(style::SECTION_GAP),
-                Self::make_label(format!("History ({})", self.records.len())),
+                Self::make_label(format!("History ({})",
+                                         self.data.as_ref().map_or(
+                                             0,
+                                             |data| data.records.len()))),
                 Self::make_vspace(style::ITEM_GAP),
-                Column::with_children(self.records.iter()
-                                      .map(Self::make_entry)
-                                      .collect())
+                Column::with_children(self.data.as_ref().map_or(
+                        Vec::new(),
+                        |data| data.records.iter()
+                            .map(Self::make_entry)
+                            .collect()))
                     .spacing(style::LIST_GAP)
                     .into()
             ];
@@ -319,7 +379,7 @@ impl MainUi {
         Space::new(Length::Units(space), Length::Shrink).into()
     }
 
-    fn make_entry<'a>(entry: &'a Record) -> UiElement!(for<'a>) {
+    fn make_entry<'a, 'b>(entry: &'a Record) -> UiElement!(for<'b>) {
         //let dt_format = |d: DateTime<_>| d.format("%Y-%m-%d %H:%M:%S");
         let time_format = |d: DateTime<_>| d.format("%H:%M:%S");
 
@@ -339,17 +399,17 @@ impl MainUi {
         }
 
         if text.is_empty() {
-            let when = time_format(entry.when_stopped);
-            text = match entry.stopped {
-                StoppedReason::SelfCrashed => format!("Crashed at {}", when),
-                StoppedReason::ManuallyKilled  => format!("Killed at {}", when),
+            let when = time_format(entry.when);
+            text = match entry.how {
+                HowItWasStopped::SelfCrashed => format!("Crashed at {}", when),
+                HowItWasStopped::ManuallyKilled  => format!("Killed at {}", when),
             };
         }
         else {
-            let when = time_format(entry.when_stopped);
-            text.push_str(&match entry.stopped {
-                StoppedReason::SelfCrashed => format!(", and crashed at {}", when),
-                StoppedReason::ManuallyKilled  => format!(", and killed at {}", when),
+            let when = time_format(entry.when);
+            text.push_str(&match entry.how {
+                HowItWasStopped::SelfCrashed => format!(", and crashed at {}", when),
+                HowItWasStopped::ManuallyKilled => format!(", and killed at {}", when),
             });
         }
 
@@ -360,6 +420,107 @@ impl MainUi {
         Self::make_label(text)
     }
 
+}
+
+// modified from 'iced/example/todos'
+impl MainData {
+    fn path() -> std::path::PathBuf {
+        let mut path = match directories::ProjectDirs::from("rs", "evolix1", "Crash Reporter") {
+            Some(project_dirs) => project_dirs.data_dir().into(),
+            None => std::env::current_dir().unwrap_or(std::path::PathBuf::new())
+        };
+
+        path.push("todos.json");
+
+        path
+    }
+
+    async fn load() -> Result<MainData, LoadError> {
+        use async_std::prelude::*;
+
+        let mut contents = String::new();
+
+        let mut file = async_std::fs::File::open(Self::path())
+            .await
+            .map_err(|_| LoadError::FileError)?;
+
+        file.read_to_string(&mut contents)
+            .await
+            .map_err(|_| LoadError::FileError)?;
+
+        serde_json::from_str(&contents)
+            .map_err(|_| LoadError::FormatError)
+    }
+
+    async fn save(self) -> Result<(), SaveError> {
+        use async_std::prelude::*;
+
+        let json = serde_json::to_string_pretty(&self)
+            .map_err(|_| SaveError::FormatError)?;
+
+        let path = Self::path();
+
+        if let Some(dir) = path.parent() {
+            async_std::fs::create_dir_all(dir)
+                .await
+                .map_err(|_| SaveError::DirectoryError)?;
+        }
+
+        {
+            let mut file = async_std::fs::File::create(path)
+                .await
+                .map_err(|_| SaveError::FileError)?;
+
+            file.write_all(json.as_bytes())
+                .await
+                .map_err(|_| SaveError::WriteError)?;
+        }
+
+        // This is a simple way to save at most once every couple seconds
+        async_std::task::sleep(std::time::Duration::from_secs(2)).await;
+
+        Ok(())
+    }
+}
+
+// modified from [https://earvinkayonga.com/posts/deserialize-date-in-rust/]
+pub mod dt_serde {
+    use chrono::{DateTime, Utc};
+    use serde::*;
+
+    pub fn serialize<S: Serializer>(dt: &DateTime<Utc>, s: S) -> Result<S::Ok, S::Error> {
+        dt.to_rfc3339()
+            .serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<DateTime<Utc>, D::Error> {
+        let time: String = Deserialize::deserialize(d)?;
+        DateTime::parse_from_rfc3339(&time)
+            .map_err(serde::de::Error::custom)
+            .map(|fixed_dt| fixed_dt.into())
+    }
+}
+
+pub mod opt_dt_serde {
+    use chrono::{DateTime, Utc};
+    use serde::*;
+
+    pub fn serialize<S: Serializer>(dt: &Option<DateTime<Utc>>, s: S) -> Result<S::Ok, S::Error> {
+        dt.as_ref()
+            .map(|dt| dt.to_rfc3339())
+            .serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<DateTime<Utc>>, D::Error> {
+        let time: String = match Deserialize::deserialize(d) {
+            Ok(v) => v,
+            // erase error from reading, bc it can happen with `null` value
+            Err(_) => return Ok(None),
+        };
+        DateTime::parse_from_rfc3339(&time)
+            .map_err(serde::de::Error::custom)
+            .map(|fixed_dt| Some(fixed_dt.into()))
+    }
 }
 
 // taken from 'iced/example/clock'

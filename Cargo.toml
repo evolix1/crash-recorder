@@ -8,5 +8,8 @@ edition = "2018"
 iced = { version = "0.1", features = ["async-std", "debug"] }
 iced_native = "0.2" # mismatch I know, but this is how thing are actually done
 chrono = "0.4"
+directories = "2.0"
 async-std = { version = "1.0", features = ["unstable"] } # taken from iced/examples/clock
-
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
