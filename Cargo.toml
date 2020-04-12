@@ -1,0 +1,12 @@
+[package]
+name = "vs-crash-reporter"
+version = "0.1.0"
+authors = ["vprodev"]
+edition = "2018"
+
+[dependencies]
+iced = { version = "0.1", features = ["async-std", "debug"] }
+iced_native = "0.2" # mismatch I know, but this is how thing are actually done
+chrono = "0.4"
+async-std = { version = "1.0", features = ["unstable"] } # taken from iced/examples/clock
+
