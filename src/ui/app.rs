@@ -1,10 +1,7 @@
 use chrono::{DateTime, Utc, Duration};
-#[allow(unused_imports)]
 use iced::{
     Application, Command, Subscription,
-    executor, scrollable, text_input, button,
-    Length, HorizontalAlignment, Align, Color,
-    Text, TextInput, Container, Scrollable, Column, Row, Button, Space, Checkbox,
+    executor, text_input, button, scrollable,
 };
 use iced_native::{Event, input::{self, keyboard}};
 
@@ -12,8 +9,8 @@ use crate::record::{Record, HowItWasStopped};
 use crate::app_data::{AppData, LoadError, SaveError};
 
 use super::utils::{time_utils};
-use super::style;
-use super::builder::{UiBuilder};
+use super::style::ButtonStyle;
+use super::builder::UiBuilder;
 
 
 #[derive(Default, Clone)]
@@ -143,12 +140,15 @@ impl Application for AppUi {
     }
 
     fn view(&mut self) -> UiElement!() {
+        let builder = UiBuilder::new();
         let now = self.ui.last_tick.unwrap_or_else(Utc::now);
         let duration_format = |d: Duration| format!(
             "{:02}:{:02}:{:02}",
             d.num_hours(),
             d.num_minutes(),
             d.num_seconds());
+
+        let records_len = self.data.as_ref().map_or(0, |data| data.records.len());
 
         let frozen_spent = match self.ui.edit.record.frozen {
             Some(when) => format!(" {} ago", duration_format(now - when)),
@@ -161,103 +161,77 @@ impl Application for AppUi {
         };
 
         //
-        let mut rows = vec![
-                UiBuilder::make_title("VS Crash report"),
-                UiBuilder::make_vspace(style::SECTION_GAP),
-                UiBuilder::make_label("New report"),
-                UiBuilder::make_vspace(style::ITEM_GAP)];
-
-        rows.push(TextInput::new(
-            &mut self.ui.edit.description_state,
-            "Description...",
-            &self.ui.edit.record.description,
-            Message::DescriptionEdited)
-            .size(16) // font size
-            .padding(5)
-            .width(Length::Fill)
-            .into());
-
-        let crash_5sec_button = UiBuilder::make_button(
+        let crash_5sec_button = builder.button(
             &mut self.ui.edit.crash_5sec_state,
             "5s ago",
-            style::ButtonStyle::Secondary,
+            ButtonStyle::Secondary,
             Message::Crash5secClicked);
 
-        let killed_button = UiBuilder::make_button(
+        let killed_button = builder.button(
             &mut self.ui.edit.killed_state,
             "Killed",
-            style::ButtonStyle::Secondary,
+            ButtonStyle::Secondary,
             Message::KilledClicked);
 
-        rows.append(&mut vec![
-            UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_form_row(
-                UiBuilder::make_checkbox(self.ui.edit.record.frozen.is_some(),
+        let history_right_part =
+            if records_len > 0 {
+               vec![builder.button(
+                   &mut self.ui.edit.clear_state,
+                   "Clear",
+                   ButtonStyle::Danger,
+                   Message::ClearClicked)]
+            }
+            else { vec![] };
+
+        let rows = vec![
+            builder.title("VS Crash report"),
+            builder.section_vspacer(),
+            builder.label("New report"),
+            builder.item_vspacer(),
+            builder.input(&mut self.ui.edit.description_state,
+                          "Description...",
+                          &self.ui.edit.record.description,
+                          Message::DescriptionEdited),
+            builder.item_vspacer(),
+            builder.form_row(
+                builder.checkbox(self.ui.edit.record.frozen.is_some(),
                                     "Frozen",
                                     Message::FrozenToggled),
-                UiBuilder::make_label(frozen_spent),
+                builder.label(frozen_spent),
             ),
-            UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_form_row(
-                UiBuilder::make_checkbox(self.ui.edit.record.busy.is_some(),
+            builder.item_vspacer(),
+            builder.form_row(
+                builder.checkbox(self.ui.edit.record.busy.is_some(),
                                     "Busy",
                                     Message::BusyToggled),
-                UiBuilder::make_label(busy_spent),
+                builder.label(busy_spent),
             ),
-            UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_button_row(
+            builder.item_vspacer(),
+            builder.button_row(
                 /* left */ vec![],
                 /* right */ vec![crash_5sec_button, killed_button]),
-            UiBuilder::make_vspace(style::SECTION_GAP),
-
-        ]);
-
-        let mut history_row = vec![
-            UiBuilder::make_label(format!("History ({})",
-                self.data.as_ref().map_or(
-                    0,
-                    |data| data.records.len()))),
+            builder.section_vspacer(),
+            builder.button_row(
+                vec![builder.label(format!("History ({})", records_len))],
+                history_right_part),
+            builder.item_vspacer(),
+            match &self.data {
+                None => {
+                    builder.placeholder("No records.")
+                },
+                Some(ref data) if data.records.is_empty() => {
+                    builder.placeholder("No records.")
+                },
+                Some(ref data) => {
+                    builder.list(&mut self.ui.records_scroll_state,
+                                 data.records .iter()
+                                     .map(|record| Self::make_entry(&builder, record))
+                                     .collect())
+                }
+            }
         ];
 
-        if self.data.as_ref().map(|data| !data.records.is_empty()).unwrap_or(false) {
-            history_row.append(
-                &mut vec![
-                UiBuilder::make_hfiller(),
-                UiBuilder::make_button(
-                    &mut self.ui.edit.clear_state,
-                    "Clear",
-                    style::ButtonStyle::Danger,
-                    Message::ClearClicked)
-                ]);
-        };
-
-        rows.append(&mut vec![
-            UiBuilder::make_row(history_row),
-            UiBuilder::make_vspace(style::ITEM_GAP),
-        ]);
-
-        let record_row = match &self.data {
-            None => {
-                UiBuilder::make_placeholder("No records.")
-            },
-            Some(ref data) if data.records.is_empty() => {
-                UiBuilder::make_placeholder("No records.")
-            },
-            Some(ref data) => {
-                Column::with_children(data.records.iter().map(Self::make_entry).collect())
-                    .width(Length::Fill)
-                    .spacing(style::LIST_GAP)
-                    .into()
-            }
-        };
-
-        rows.push(Scrollable::new(&mut self.ui.records_scroll_state)
-                  .width(Length::Fill)
-                  .padding(5)
-                  .push(record_row)
-                  .into());
-
-        UiBuilder::make_root(self.ui.layout_debug, rows)
+        builder.root(self.ui.layout_debug, rows)
     }
 }
 
@@ -281,7 +255,7 @@ impl AppUi {
         }
     }
 
-    fn make_entry<'a, 'b>(entry: &'a Record) -> UiElement!(for<'b>) {
+    fn make_entry<'a, 'b>(builder: &UiBuilder, entry: &'a Record) -> UiElement!(for<'b>) {
         //let dt_format = |d: DateTime<_>| d.format("%Y-%m-%d %H:%M:%S");
         let time_format = |d: DateTime<_>| d.format("%H:%M:%S");
 
@@ -319,7 +293,7 @@ impl AppUi {
             text.push_str(&format!(" ({})", entry.description));
         }
 
-        UiBuilder::make_label(text)
+        builder.label(text)
     }
 
 }

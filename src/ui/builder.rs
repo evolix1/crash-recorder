@@ -1,7 +1,7 @@
 use iced::{
-    button,
+    button, text_input, scrollable,
     Length, HorizontalAlignment, Align, Color,
-    Text, Container, Column, Row, Button, Space, Checkbox,
+    Text, TextInput, Container, Column, Row, Button, Space, Checkbox, Scrollable,
 };
 
 use super::style;
@@ -9,8 +9,12 @@ use super::style;
 pub struct UiBuilder;
 
 impl UiBuilder {
-    pub fn make_root<'a>(debug: bool,
-                         items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>) {
+    pub fn new() -> UiBuilder {
+        UiBuilder {}
+    }
+
+    pub fn root<'a>(&self, debug: bool,
+                    items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>) {
         let mut central: UiElement!() =
             Column::with_children(items)
             .padding(20)
@@ -28,15 +32,9 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_row(items: Vec<UiElement!()>) -> UiElement!() {
-        Row::with_children(items)
-            .width(Length::Fill)
-            .align_items(Align::Center) // vertical align
-            .into()
-    }
-
-    pub fn make_button_row<'a>(mut left: Vec<UiElement!(for<'a>)>,
-                               mut right: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>)
+    pub fn button_row<'a>(&self,
+        mut left: Vec<UiElement!(for<'a>)>,
+        mut right: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>)
     {
         let mut row = Row::new()
             .width(Length::Fill)
@@ -44,16 +42,16 @@ impl UiBuilder {
 
         for (i, element) in left.drain(..).enumerate() {
             if i > 0 {
-                row = row.push(Self::make_hspace(style::BUTTON_GAP));
+                row = row.push(self.action_hspacer());
             }
             row = row.push(element);
         }
 
-        row = row.push(Self::make_hfiller());
+        row = row.push(Space::new(Length::Fill, Length::Shrink));
 
         for (i, element) in right.drain(..).enumerate() {
             if i > 0 {
-                row = row.push(Self::make_hspace(style::BUTTON_GAP));
+                row = row.push(self.action_hspacer());
             }
             row = row.push(element);
         }
@@ -61,10 +59,10 @@ impl UiBuilder {
         row.into()
     }
 
-    pub fn make_form_row<'a, L, R>(left: L, right: R) -> UiElement!(for<'a>)
+    pub fn form_row<'a, L, R>(&self, left: L, right: R) -> UiElement!(for<'a>)
         where
-            L: Into<UiElement!(for<'a>)>,
-            R: Into<UiElement!(for<'a>)>,
+        L: Into<UiElement!(for<'a>)>,
+        R: Into<UiElement!(for<'a>)>,
     {
         Row::new()
             .push(Container::new(left.into())
@@ -77,7 +75,22 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_title(title: &str) -> UiElement!() {
+    pub fn list<'a>(&self,
+                    state: &'a mut scrollable::State,
+                    items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>)
+    {
+        let central = Column::with_children(items)
+            .width(Length::Fill)
+            .spacing(style::LIST_GAP);
+
+        Scrollable::new(state)
+            .width(Length::Fill)
+            .padding(5)
+            .push(central)
+            .into()
+    }
+
+    pub fn title<'a>(&self, title: &str) -> UiElement!(for<'a>) {
         Text::new(title)
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
@@ -86,7 +99,7 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_placeholder(text: &str) -> UiElement!() {
+    pub fn placeholder<'a>(&self, text: &str) -> UiElement!(for<'a>) {
         Text::new(text)
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
@@ -95,19 +108,30 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_label<T>(label: T) -> UiElement!(for<'static>)
-        where T: Into<String>
-    {
+    pub fn label<T>(&self, label: T) -> UiElement!(for<'static>) where T: Into<String> {
         Text::new(label)
             .size(18) // font size
             .color([0.2, 0.2, 0.2]) // font color
             .into()
     }
 
-    pub fn make_button<'a>(state: &'a mut button::State,
-                           text: &str,
-                           btn_style: style::ButtonStyle,
-                           msg: UiMessage!()) -> UiElement!(for<'a>) {
+    pub fn input<'a>(&self,
+                     state: &'a mut text_input::State,
+                     placeholder: &'a str,
+                     value: &'a str,
+                     msg: fn(String) -> UiMessage!()) -> UiElement!(for<'a>) {
+        TextInput::new(state, placeholder, value, msg)
+            .size(16) // font size
+            .padding(5)
+            .width(Length::Fill)
+            .into()
+    }
+
+
+    pub fn button<'a>(&self, state: &'a mut button::State,
+                      text: &str,
+                      btn_style: style::ButtonStyle,
+                      msg: UiMessage!()) -> UiElement!(for<'a>) {
         Button::new(state, Text::new(text))
             .min_width(50)
             .min_height(20)
@@ -117,23 +141,26 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_checkbox(state: bool, text: &str, msg: fn(bool) -> UiMessage!()) -> UiElement!() {
+    pub fn checkbox<'a>(&self,
+                        state: bool,
+                        text: &'a str,
+                        msg: fn(bool) -> UiMessage!()) -> UiElement!(for<'a>) {
         Checkbox::new(state, text, msg)
             .spacing(8)
             .text_size(18)
             .into()
     }
 
-    pub fn make_vspace(space: u16) -> UiElement!(for<'static>) {
-        Space::new(Length::Shrink, Length::Units(space)).into()
+    pub fn section_vspacer(&self) -> UiElement!(for<'static>) {
+        Space::new(Length::Shrink, Length::Units(style::SECTION_GAP)).into()
     }
 
-    pub fn make_hspace(space: u16) -> UiElement!(for<'static>) {
-        Space::new(Length::Units(space), Length::Shrink).into()
+    pub fn item_vspacer(&self) -> UiElement!(for<'static>) {
+        Space::new(Length::Shrink, Length::Units(style::ITEM_GAP)).into()
     }
 
-    pub fn make_hfiller() -> UiElement!(for<'static>) {
-        Space::new(Length::Fill, Length::Shrink).into()
+    pub fn action_hspacer(&self) -> UiElement!(for<'static>) {
+        Space::new(Length::Units(style::BUTTON_GAP), Length::Shrink).into()
     }
 
 }
