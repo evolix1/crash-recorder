@@ -12,7 +12,7 @@ use crate::record::{Record, HowItWasStopped};
 use crate::app_data::{AppData, LoadError, SaveError};
 
 use super::utils::{time_utils};
-use super::style::{style};
+use super::style;
 use super::builder::{UiBuilder};
 
 
@@ -180,11 +180,13 @@ impl Application for AppUi {
         let crash_5sec_button = UiBuilder::make_button(
             &mut self.ui.edit.crash_5sec_state,
             "5s ago",
+            style::ButtonStyle::Secondary,
             Message::Crash5secClicked);
 
         let killed_button = UiBuilder::make_button(
             &mut self.ui.edit.killed_state,
             "Killed",
+            style::ButtonStyle::Secondary,
             Message::KilledClicked);
 
         rows.append(&mut vec![
@@ -224,6 +226,7 @@ impl Application for AppUi {
                 UiBuilder::make_button(
                     &mut self.ui.edit.clear_state,
                     "Clear",
+                    style::ButtonStyle::Danger,
                     Message::ClearClicked)
                 ]);
         };

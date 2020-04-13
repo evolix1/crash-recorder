@@ -4,13 +4,13 @@ use iced::{
     Text, Container, Column, Row, Button, Space, Checkbox,
 };
 
-use super::style::style;
+use super::style;
 
 pub struct UiBuilder;
 
 impl UiBuilder {
     pub fn make_root<'a>(debug: bool,
-                     items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>) {
+                         items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>) {
         let mut central: UiElement!() =
             Column::with_children(items)
             .padding(20)
@@ -104,13 +104,16 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn make_button<'a>(state: &'a mut button::State, text: &str,
-                   msg: UiMessage!()) -> UiElement!(for<'a>) {
+    pub fn make_button<'a>(state: &'a mut button::State,
+                           text: &str,
+                           btn_style: style::ButtonStyle,
+                           msg: UiMessage!()) -> UiElement!(for<'a>) {
         Button::new(state, Text::new(text))
             .min_width(50)
             .min_height(20)
             .padding(10)
             .on_press(msg)
+            .style(btn_style)
             .into()
     }
 
