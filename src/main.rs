@@ -115,20 +115,26 @@ struct MainUiEditState {
     description_state: text_input::State,
     crash_5sec_state: button::State,
     killed_state: button::State,
+    clear_state: button::State,
 }
 
 
 impl MainUi {
     fn register_entry(&mut self) -> Command<UiMessage!()>
     {
-        if let Some(ref mut data) = &mut self.data {
+        if let Some(ref mut data) = &mut self.data.as_mut() {
             let edit = std::mem::take(&mut self.ui.edit);
             data.records.push(edit.record);
-            Command::perform(data.clone().save(), Message::Saved)
-        }
-        else
-        {
-            Command::none()
+        };
+
+        self.save_command()
+    }
+
+    fn save_command(&mut self) -> Command<UiMessage!()>
+    {
+        match &mut self.data {
+            Some(ref mut data) => Command::perform(data.clone().save(), Message::Saved),
+            None => Command::none()
         }
     }
 }
@@ -146,6 +152,7 @@ enum Message {
     BusyToggled(bool),
     Crash5secClicked,
     KilledClicked,
+    ClearClicked,
 }
 
 
@@ -221,6 +228,12 @@ impl Application for MainUi {
                 self.ui.edit.record.when = Utc::now();
                 return self.register_entry();
             },
+            Message::ClearClicked => {
+                if let Some(ref mut data) = &mut self.data {
+                    *data = MainData::default();
+                };
+                return self.save_command();
+            },
         }
 
         Command::none()
@@ -234,15 +247,6 @@ impl Application for MainUi {
             d.num_minutes(),
             d.num_seconds());
 
-        let description_input = TextInput::new(
-            &mut self.ui.edit.description_state,
-            "Description...",
-            &self.ui.edit.record.description,
-            Message::DescriptionEdited)
-            .size(16) // font size
-            .padding(5)
-            .width(Length::Fill);
-
         let frozen_spent = match self.ui.edit.record.frozen {
             Some(when) => format!(" {} ago", duration_format(now - when)),
             None => String::new()
@@ -253,58 +257,91 @@ impl Application for MainUi {
             None => String::new()
         };
 
-        let lines = vec![
+        //
+        let mut rows = vec![
                 Self::make_title("VS Crash report"),
                 Self::make_vspace(style::SECTION_GAP),
                 Self::make_label("New report"),
-                Self::make_vspace(style::ITEM_GAP),
-                description_input.into(),
-                Self::make_vspace(style::ITEM_GAP),
-                Self::make_row(vec![
-                    Self::make_checkbox(self.ui.edit.record.frozen.is_some(),
-                                        "Frozen",
-                                        Message::FrozenToggled),
-                    Self::make_hspace(style::ITEM_GAP),
-                    Self::make_label(frozen_spent),
-                ]),
-                Self::make_vspace(style::ITEM_GAP),
-                Self::make_row(vec![
-                    Self::make_checkbox(self.ui.edit.record.busy.is_some(),
-                                        "Busy",
-                                        Message::BusyToggled),
-                    Self::make_hspace(style::ITEM_GAP),
-                    Self::make_label(busy_spent),
-                ]),
-                Self::make_vspace(style::ITEM_GAP),
-                Self::make_row(vec![
-                    Self::make_button(&mut self.ui.edit.crash_5sec_state,
-                                      "5s ago",
-                                      Message::Crash5secClicked),
-                    Self::make_hspace(style::ITEM_GAP),
-                    Self::make_button(&mut self.ui.edit.killed_state,
-                                      "Killed",
-                                      Message::KilledClicked),
-                ]),
-                Self::make_vspace(style::SECTION_GAP),
-                Self::make_label(format!("History ({})",
-                                         self.data.as_ref().map_or(
-                                             0,
-                                             |data| data.records.len()))),
-                Self::make_vspace(style::ITEM_GAP),
-                Scrollable::new(&mut self.ui.records_scroll_state)
-                    .width(Length::Fill)
-                    .push(Column::with_children(self.data.as_ref().map_or(
-                            Vec::new(),
-                            |data| data.records.iter()
-                                .map(Self::make_entry)
-                                .collect()))
-                        .spacing(style::LIST_GAP))
-                    .into(),
-            ];
+                Self::make_vspace(style::ITEM_GAP)];
 
-        Self::make_root(
-            self.ui.layout_debug,
-            lines)
+        rows.push(TextInput::new(
+            &mut self.ui.edit.description_state,
+            "Description...",
+            &self.ui.edit.record.description,
+            Message::DescriptionEdited)
+            .size(16) // font size
+            .padding(5)
+            .width(Length::Fill)
+            .into());
+
+        rows.append(&mut vec![
+            Self::make_vspace(style::ITEM_GAP),
+            Self::make_row(vec![
+                Self::make_checkbox(self.ui.edit.record.frozen.is_some(),
+                                    "Frozen",
+                                    Message::FrozenToggled),
+                Self::make_hspace(style::ITEM_GAP),
+                Self::make_label(frozen_spent),
+            ]),
+            Self::make_vspace(style::ITEM_GAP),
+            Self::make_row(vec![
+                Self::make_checkbox(self.ui.edit.record.busy.is_some(),
+                                    "Busy",
+                                    Message::BusyToggled),
+                Self::make_hspace(style::ITEM_GAP),
+                Self::make_label(busy_spent),
+            ]),
+            Self::make_vspace(style::ITEM_GAP),
+            Self::make_row(vec![
+                Self::make_button(&mut self.ui.edit.crash_5sec_state,
+                                  "5s ago",
+                                  Message::Crash5secClicked),
+                Self::make_hspace(style::ITEM_GAP),
+                Self::make_button(&mut self.ui.edit.killed_state,
+                                  "Killed",
+                                  Message::KilledClicked),
+            ]),
+            Self::make_vspace(style::SECTION_GAP),
+            Self::make_label(format!("History ({})",
+                                     self.data.as_ref().map_or(
+                                         0,
+                                         |data| data.records.len()))),
+            Self::make_vspace(style::ITEM_GAP),
+        ]);
+
+        let items = match &self.data {
+            None => {
+                Self::make_placeholder("No records.")
+            },
+            Some(ref data) if data.records.is_empty() => {
+                Self::make_placeholder("No records.")
+            },
+            Some(ref data) => {
+                Column::with_children(data.records.iter().map(Self::make_entry).collect())
+                    .width(Length::Fill)
+                    .spacing(style::LIST_GAP)
+                    .into()
+            }
+        };
+
+        rows.push(Scrollable::new(&mut self.ui.records_scroll_state)
+                  .width(Length::Fill)
+                  .padding(5)
+                  .push(items)
+                  .into());
+
+        if self.data.as_ref().map(|data| !data.records.is_empty()).unwrap_or(false) {
+            rows.append(
+                &mut vec![
+                Self::make_vspace(style::ITEM_GAP),
+                Self::make_button(
+                    &mut self.ui.edit.clear_state,
+                    "Clear",
+                    Message::ClearClicked)
+                ]);
+        };
+
+        Self::make_root(self.ui.layout_debug, rows)
     }
 }
 
@@ -340,6 +377,15 @@ impl MainUi {
             .width(Length::Fill)
             .size(22)
             .color([0.1, 0.1, 0.1])
+            .into()
+    }
+
+    fn make_placeholder(text: &str) -> UiElement!() {
+        Text::new(text)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .width(Length::Fill)
+            .size(18)
+            .color([0.1, 0.1, 0.3])
             .into()
     }
 
