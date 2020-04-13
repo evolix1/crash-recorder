@@ -1,5 +1,5 @@
 [package]
-name = "vs-crash-reporter"
+name = "crash-recorder"
 version = "0.1.0"
 authors = ["vprodev"]
 edition = "2018"

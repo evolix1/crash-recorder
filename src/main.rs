@@ -104,8 +104,7 @@ struct MainUiState {
     last_tick: Option<DateTime<Utc>>,
     edit: MainUiEditState,
     // layout
-    app_scroll_state: scrollable::State,
-    _records_scroll_state: scrollable::State,
+    records_scroll_state: scrollable::State,
 }
 
 
@@ -163,7 +162,7 @@ impl Application for MainUi {
     }
 
     fn title(&self) -> String {
-        "Crash reporter".into()
+        "Crash recorder".into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -181,8 +180,7 @@ impl Application for MainUi {
             Message::DataLoaded(Err(_)) => {
                 self.data = Some(MainData::default());
             },
-            Message::Saved(_) => {
-            },
+            Message::Saved(_) => (),
             Message::Tick(when) => {
                 self.ui.last_tick = Some(when);
             },
@@ -293,30 +291,30 @@ impl Application for MainUi {
                                              0,
                                              |data| data.records.len()))),
                 Self::make_vspace(style::ITEM_GAP),
-                Column::with_children(self.data.as_ref().map_or(
-                        Vec::new(),
-                        |data| data.records.iter()
-                            .map(Self::make_entry)
-                            .collect()))
-                    .spacing(style::LIST_GAP)
-                    .into()
+                Scrollable::new(&mut self.ui.records_scroll_state)
+                    .width(Length::Fill)
+                    .push(Column::with_children(self.data.as_ref().map_or(
+                            Vec::new(),
+                            |data| data.records.iter()
+                                .map(Self::make_entry)
+                                .collect()))
+                        .spacing(style::LIST_GAP))
+                    .into(),
             ];
 
         Self::make_root(
-            &mut self.ui.app_scroll_state,
             self.ui.layout_debug,
             lines)
     }
 }
 
 impl MainUi {
-    fn make_root<'a>(state: &'a mut scrollable::State,
-                     debug: bool,
+    fn make_root<'a>(debug: bool,
                      items: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>) {
-        let mut central: UiElement!() = Scrollable::new(state)
-            .push(Column::with_children(items)
-                  .padding(20)
-                  .width(Length::Units(500))) // window content width
+        let mut central: UiElement!() =
+            Column::with_children(items)
+            .padding(20)
+            .width(Length::Units(500)) // window content width
             .into();
 
         if debug {
@@ -425,12 +423,12 @@ impl MainUi {
 // modified from 'iced/example/todos'
 impl MainData {
     fn path() -> std::path::PathBuf {
-        let mut path = match directories::ProjectDirs::from("rs", "evolix1", "Crash Reporter") {
+        let mut path = match directories::ProjectDirs::from("rs", "evolix1", "Crash Recorder") {
             Some(project_dirs) => project_dirs.data_dir().into(),
             None => std::env::current_dir().unwrap_or(std::path::PathBuf::new())
         };
 
-        path.push("todos.json");
+        path.push("records.json");
 
         path
     }
