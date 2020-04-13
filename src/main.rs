@@ -302,14 +302,32 @@ impl Application for MainUi {
                                   Message::KilledClicked),
             ]),
             Self::make_vspace(style::SECTION_GAP),
+        ]);
+
+        let mut history_row = vec![
             Self::make_label(format!("History ({})",
-                                     self.data.as_ref().map_or(
-                                         0,
-                                         |data| data.records.len()))),
+                self.data.as_ref().map_or(
+                    0,
+                    |data| data.records.len()))),
+        ];
+
+        if self.data.as_ref().map(|data| !data.records.is_empty()).unwrap_or(false) {
+            history_row.append(
+                &mut vec![
+                Self::make_hfiller(),
+                Self::make_button(
+                    &mut self.ui.edit.clear_state,
+                    "Clear",
+                    Message::ClearClicked)
+                ]);
+        };
+
+        rows.append(&mut vec![
+            Self::make_row(history_row),
             Self::make_vspace(style::ITEM_GAP),
         ]);
 
-        let items = match &self.data {
+        let record_row = match &self.data {
             None => {
                 Self::make_placeholder("No records.")
             },
@@ -327,19 +345,8 @@ impl Application for MainUi {
         rows.push(Scrollable::new(&mut self.ui.records_scroll_state)
                   .width(Length::Fill)
                   .padding(5)
-                  .push(items)
+                  .push(record_row)
                   .into());
-
-        if self.data.as_ref().map(|data| !data.records.is_empty()).unwrap_or(false) {
-            rows.append(
-                &mut vec![
-                Self::make_vspace(style::ITEM_GAP),
-                Self::make_button(
-                    &mut self.ui.edit.clear_state,
-                    "Clear",
-                    Message::ClearClicked)
-                ]);
-        };
 
         Self::make_root(self.ui.layout_debug, rows)
     }
@@ -421,6 +428,10 @@ impl MainUi {
 
     fn make_hspace(space: u16) -> UiElement!(for<'static>) {
         Space::new(Length::Units(space), Length::Shrink).into()
+    }
+
+    fn make_hfiller() -> UiElement!(for<'static>) {
+        Space::new(Length::Fill, Length::Shrink).into()
     }
 
     fn make_entry<'a, 'b>(entry: &'a Record) -> UiElement!(for<'b>) {
