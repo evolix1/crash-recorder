@@ -18,7 +18,7 @@ struct AppUiEditState {
     record: Record,
     // widgets
     description_state: text_input::State,
-    crash_5sec_state: button::State,
+    crash_state: button::State,
     killed_state: button::State,
     clear_state: button::State,
 }
@@ -50,7 +50,7 @@ pub enum Message {
     DescriptionEdited(String),
     FrozenToggled(bool),
     BusyToggled(bool),
-    Crash5secClicked,
+    CrashClicked,
     KilledClicked,
     ClearClicked,
 }
@@ -118,7 +118,7 @@ impl Application for AppUi {
                     if checked { Some(Utc::now()) }
                     else { None };
             },
-            Message::Crash5secClicked => {
+            Message::CrashClicked => {
                 self.ui.edit.record.how = HowItWasStopped::SelfCrashed;
                 self.ui.edit.record.when = Utc::now();
                 return self.register_entry();
@@ -161,11 +161,11 @@ impl Application for AppUi {
         };
 
         //
-        let crash_5sec_button = builder.button(
-            &mut self.ui.edit.crash_5sec_state,
-            "5s ago",
+        let crash_button = builder.button(
+            &mut self.ui.edit.crash_state,
+            "Crashed",
             ButtonStyle::Secondary,
-            Message::Crash5secClicked);
+            Message::CrashClicked);
 
         let killed_button = builder.button(
             &mut self.ui.edit.killed_state,
@@ -209,7 +209,7 @@ impl Application for AppUi {
             builder.item_vspacer(),
             builder.button_row(
                 /* left */ vec![],
-                /* right */ vec![crash_5sec_button, killed_button]),
+                /* right */ vec![crash_button, killed_button]),
             builder.section_vspacer(),
             builder.button_row(
                 vec![builder.label(format!("History ({})", records_len))],

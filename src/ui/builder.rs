@@ -94,7 +94,8 @@ impl UiBuilder {
         Text::new(title)
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
-            .size(22)
+            .font(style::FontStyle::Bold.into())
+            .size(24)
             .color([0.1, 0.1, 0.1])
             .into()
     }
@@ -103,13 +104,18 @@ impl UiBuilder {
         Text::new(text)
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
+            .font(style::FontStyle::Italic.into())
             .size(18)
             .color([0.1, 0.1, 0.3])
             .into()
     }
 
-    pub fn label<T>(&self, label: T) -> UiElement!(for<'static>) where T: Into<String> {
+    pub fn label<T>(&self, label: T) -> UiElement!(for<'static>)
+        where
+        T: Into<String>
+    {
         Text::new(label)
+            .font(style::FontStyle::Regular.into())
             .size(18) // font size
             .color([0.2, 0.2, 0.2]) // font color
             .into()
