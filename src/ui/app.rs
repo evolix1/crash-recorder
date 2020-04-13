@@ -177,34 +177,37 @@ impl Application for AppUi {
             .width(Length::Fill)
             .into());
 
+        let crash_5sec_button = UiBuilder::make_button(
+            &mut self.ui.edit.crash_5sec_state,
+            "5s ago",
+            Message::Crash5secClicked);
+
+        let killed_button = UiBuilder::make_button(
+            &mut self.ui.edit.killed_state,
+            "Killed",
+            Message::KilledClicked);
+
         rows.append(&mut vec![
             UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_row(vec![
+            UiBuilder::make_form_row(
                 UiBuilder::make_checkbox(self.ui.edit.record.frozen.is_some(),
                                     "Frozen",
                                     Message::FrozenToggled),
-                UiBuilder::make_hspace(style::ITEM_GAP),
                 UiBuilder::make_label(frozen_spent),
-            ]),
+            ),
             UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_row(vec![
+            UiBuilder::make_form_row(
                 UiBuilder::make_checkbox(self.ui.edit.record.busy.is_some(),
                                     "Busy",
                                     Message::BusyToggled),
-                UiBuilder::make_hspace(style::ITEM_GAP),
                 UiBuilder::make_label(busy_spent),
-            ]),
+            ),
             UiBuilder::make_vspace(style::ITEM_GAP),
-            UiBuilder::make_row(vec![
-                UiBuilder::make_button(&mut self.ui.edit.crash_5sec_state,
-                                  "5s ago",
-                                  Message::Crash5secClicked),
-                UiBuilder::make_hspace(style::ITEM_GAP),
-                UiBuilder::make_button(&mut self.ui.edit.killed_state,
-                                  "Killed",
-                                  Message::KilledClicked),
-            ]),
+            UiBuilder::make_button_row(
+                /* left */ vec![],
+                /* right */ vec![crash_5sec_button, killed_button]),
             UiBuilder::make_vspace(style::SECTION_GAP),
+
         ]);
 
         let mut history_row = vec![

@@ -4,6 +4,8 @@ use iced::{
     Text, Container, Column, Row, Button, Space, Checkbox,
 };
 
+use super::style::style;
+
 pub struct UiBuilder;
 
 impl UiBuilder {
@@ -12,6 +14,7 @@ impl UiBuilder {
         let mut central: UiElement!() =
             Column::with_children(items)
             .padding(20)
+            .align_items(Align::Start) // horizontal align
             .width(Length::Units(500)) // window content width
             .into();
 
@@ -28,7 +31,49 @@ impl UiBuilder {
     pub fn make_row(items: Vec<UiElement!()>) -> UiElement!() {
         Row::with_children(items)
             .width(Length::Fill)
-            .align_items(Align::Center)
+            .align_items(Align::Center) // vertical align
+            .into()
+    }
+
+    pub fn make_button_row<'a>(mut left: Vec<UiElement!(for<'a>)>,
+                               mut right: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>)
+    {
+        let mut row = Row::new()
+            .width(Length::Fill)
+            .align_items(Align::Center);
+
+        for (i, element) in left.drain(..).enumerate() {
+            if i > 0 {
+                row = row.push(Self::make_hspace(style::BUTTON_GAP));
+            }
+            row = row.push(element);
+        }
+
+        row = row.push(Self::make_hfiller());
+
+        for (i, element) in right.drain(..).enumerate() {
+            if i > 0 {
+                row = row.push(Self::make_hspace(style::BUTTON_GAP));
+            }
+            row = row.push(element);
+        }
+
+        row.into()
+    }
+
+    pub fn make_form_row<'a, L, R>(left: L, right: R) -> UiElement!(for<'a>)
+        where
+            L: Into<UiElement!(for<'a>)>,
+            R: Into<UiElement!(for<'a>)>,
+    {
+        Row::new()
+            .push(Container::new(left.into())
+                  .width(Length::Units(style::FORM_LAYOUT_LEFT_WIDTH))
+                  .max_width(style::FORM_LAYOUT_LEFT_WIDTH as u32))
+            .push(Container::new(right.into())
+                  .width(Length::Fill))
+            .width(Length::Fill)
+            .align_items(Align::Center) // vertical align
             .into()
     }
 
