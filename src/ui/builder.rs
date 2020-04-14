@@ -90,8 +90,10 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn title<'a>(&self, title: &str) -> UiElement!(for<'a>) {
-        Text::new(title)
+    pub fn title<T>(&self, title: T) -> UiElement!(for<'static>) 
+        where T: Into<String>
+    {
+        Text::new(title.into())
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
             .font(style::FontStyle::Bold.into())
@@ -100,8 +102,10 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn placeholder<'a>(&self, text: &str) -> UiElement!(for<'a>) {
-        Text::new(text)
+    pub fn placeholder<T>(&self, text: T) -> UiElement!(for<'static>) 
+        where T: Into<String>
+    {
+        Text::new(text.into())
             .horizontal_alignment(HorizontalAlignment::Center)
             .width(Length::Fill)
             .font(style::FontStyle::Italic.into())
@@ -111,8 +115,7 @@ impl UiBuilder {
     }
 
     pub fn label<T>(&self, label: T) -> UiElement!(for<'static>)
-        where
-        T: Into<String>
+        where T: Into<String>
     {
         Text::new(label)
             .font(style::FontStyle::Regular.into())

@@ -184,9 +184,7 @@ impl Application for AppUi {
             else { vec![] };
 
         let rows = vec![
-            builder.title("VS Crash report"),
-            builder.section_vspacer(),
-            builder.label("New report"),
+            builder.title("Record"),
             builder.item_vspacer(),
             builder.input(&mut self.ui.edit.description_state,
                           "Description...",
@@ -212,7 +210,7 @@ impl Application for AppUi {
                 /* right */ vec![crash_button, killed_button]),
             builder.section_vspacer(),
             builder.button_row(
-                vec![builder.label(format!("History ({})", records_len))],
+                vec![builder.title(format!("History ({})", records_len))],
                 history_right_part),
             builder.item_vspacer(),
             match &self.data {
