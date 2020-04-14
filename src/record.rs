@@ -10,6 +10,16 @@ pub enum HowItWasStopped {
 }
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WhatWasHappening {
+    Typing,     // not in execution
+    Running,    // during execution, user inputs, not halted by debugger
+    Testing,    // during execution, automatic inputs, not halted by debugger
+    Debugging,  // during execution, halted by debugger
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     #[serde(
@@ -21,6 +31,7 @@ pub struct Record {
         deserialize_with="opt_dt_serde::deserialize")]
     pub busy: Option<DateTime<Utc>>,
     pub description: String,
+    pub what: Option<WhatWasHappening>,
     pub how: HowItWasStopped,
     #[serde(
         serialize_with="dt_serde::serialize",
@@ -35,6 +46,7 @@ impl Default for Record {
             frozen: None,
             busy: None,
             description: String::new(),
+            what: None,
             how: HowItWasStopped::SelfCrashed,
             when: Utc::now(),
         }

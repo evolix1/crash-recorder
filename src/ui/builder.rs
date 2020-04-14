@@ -1,10 +1,21 @@
 use iced::{
     button, text_input, scrollable,
     Length, HorizontalAlignment, Align, Color,
-    Text, TextInput, Container, Column, Row, Button, Space, Checkbox, Scrollable,
+    Container, Column, Row, Scrollable, 
+    Text, TextInput, Button, Space, Checkbox, Radio,
 };
 
 use super::style;
+
+
+#[derive(PartialEq)]
+pub enum ColumnAlignment {
+    Left,       //  [X..X..]
+    Inward,     //  [..XX..]
+    Outward,    //  [X....X]
+    Right       //  [..X..X]
+}
+
 
 pub struct UiBuilder;
 
@@ -19,7 +30,7 @@ impl UiBuilder {
             Column::with_children(items)
             .padding(20)
             .align_items(Align::Start) // horizontal align
-            .width(Length::Units(500)) // window content width
+            .width(Length::Units(style::WINDOW_WIDTH))
             .into();
 
         if debug {
@@ -32,30 +43,52 @@ impl UiBuilder {
             .into()
     }
 
-    pub fn button_row<'a>(&self,
+    pub fn two_col_row<'a>(&self,
         mut left: Vec<UiElement!(for<'a>)>,
-        mut right: Vec<UiElement!(for<'a>)>) -> UiElement!(for<'a>)
+        mut right: Vec<UiElement!(for<'a>)>,
+        align: ColumnAlignment) -> UiElement!(for<'a>)
     {
-        let mut row = Row::new()
-            .width(Length::Fill)
-            .align_items(Align::Center);
+        let mut left_row = Row::new().align_items(Align::Center);
+        let mut right_row = Row::new().align_items(Align::Center);
+        let has_left = !left.is_empty();
+        let has_right = !right.is_empty();
+
+        if has_left && (align == ColumnAlignment::Inward || align == ColumnAlignment::Right) {
+            left_row = left_row.push(Space::new(Length::Fill, Length::Shrink));
+        }
 
         for (i, element) in left.drain(..).enumerate() {
             if i > 0 {
-                row = row.push(self.action_hspacer());
+                left_row = left_row.push(self.action_hspacer());
             }
-            row = row.push(element);
+            left_row = left_row.push(element);
         }
 
-        row = row.push(Space::new(Length::Fill, Length::Shrink));
+        if has_right && (align == ColumnAlignment::Outward || align == ColumnAlignment::Right) {
+            right_row = right_row.push(Space::new(Length::Fill, Length::Shrink));
+        }
 
         for (i, element) in right.drain(..).enumerate() {
             if i > 0 {
-                row = row.push(self.action_hspacer());
+                right_row = right_row.push(self.action_hspacer());
             }
-            row = row.push(element);
+            right_row = right_row.push(element);
         }
 
+        let mut row = Row::new().width(Length::Fill).align_items(Align::Center);
+
+        if has_left {
+            row = row.push(left_row.width(Length::FillPortion(1)));
+        }
+            
+        if has_left != has_right {
+            row = row.push(Space::new(Length::Fill, Length::Shrink));
+        }
+            
+        if has_right {
+            row = row.push(right_row.width(Length::FillPortion(1)));
+        }
+        
         row.into()
     }
 
@@ -152,11 +185,28 @@ impl UiBuilder {
 
     pub fn checkbox<'a>(&self,
                         state: bool,
-                        text: &'a str,
+                        label: &'a str,
+                        btn_style: style::ButtonStyle,
                         msg: fn(bool) -> UiMessage!()) -> UiElement!(for<'a>) {
-        Checkbox::new(state, text, msg)
+        Checkbox::new(state, label, msg)
             .spacing(8)
             .text_size(18)
+            .style(btn_style)
+            .into()
+    }
+
+    pub fn radio<'a, T>(&self,
+                        value: T,
+                        label: &'a str,
+                        current: Option<T>,
+                        btn_style: style::ButtonStyle,
+                        msg: fn(T) -> UiMessage!()) -> UiElement!(for<'a>) 
+        where T: 'static + Eq + Copy 
+    {
+        Radio::new(value, label, current, msg)
+            //.spacing(8)
+            //.text_size(18)
+            .style(btn_style)
             .into()
     }
 

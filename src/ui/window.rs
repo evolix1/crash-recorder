@@ -5,16 +5,16 @@ use iced::{
 };
 use iced_native::{Event, input::{self, keyboard}};
 
-use crate::record::{Record, HowItWasStopped};
+use crate::record::{Record, HowItWasStopped, WhatWasHappening};
 use crate::app_data::{AppData, LoadError, SaveError};
 
-use super::utils::{time_utils};
+use super::utils::time_utils;
 use super::style::ButtonStyle;
-use super::builder::UiBuilder;
+use super::builder::{UiBuilder, ColumnAlignment};
 
 
 #[derive(Default, Clone)]
-struct AppUiEditState {
+struct WindowUiEditState {
     record: Record,
     // widgets
     description_state: text_input::State,
@@ -25,19 +25,19 @@ struct AppUiEditState {
 
 
 #[derive(Default)]
-struct AppUiState {
+struct WindowUiState {
     layout_debug: bool,
     last_tick: Option<DateTime<Utc>>,
-    edit: AppUiEditState,
+    edit: WindowUiEditState,
     // layout
     records_scroll_state: scrollable::State,
 }
 
 
 #[derive(Default)]
-pub struct AppUi {
+pub struct MainWindow {
     data: Option<AppData>,
-    ui: AppUiState,
+    ui: WindowUiState,
 }
 
 
@@ -47,6 +47,7 @@ pub enum Message {
     Saved(Result<(), SaveError>),
     Tick(DateTime<Utc>),
     EventOccurred(Event),
+    WhatChanged(WhatWasHappening),
     DescriptionEdited(String),
     FrozenToggled(bool),
     BusyToggled(bool),
@@ -56,7 +57,7 @@ pub enum Message {
 }
 
 
-impl Application for AppUi {
+impl Application for MainWindow {
     type Executor = executor::Default;
     type Message = Message;
     type Flags = ();
@@ -104,6 +105,9 @@ impl Application for AppUi {
                     },
                     _ => ()
                 }
+            },
+            Message::WhatChanged(what) => {
+                self.ui.edit.record.what = Some(what);
             },
             Message::DescriptionEdited(value) => {
                 self.ui.edit.record.description = value;
@@ -186,6 +190,34 @@ impl Application for AppUi {
         let rows = vec![
             builder.title("Record"),
             builder.item_vspacer(),
+            builder.two_col_row(
+                vec![builder.radio(WhatWasHappening::Typing,
+                          "Typing",
+                          self.ui.edit.record.what,
+                          ButtonStyle::Secondary,
+                          Message::WhatChanged)],
+                vec![builder.radio(WhatWasHappening::Running,
+                          "Running",
+                          self.ui.edit.record.what,
+                          ButtonStyle::Secondary,
+                          Message::WhatChanged)],
+                ColumnAlignment::Left
+            ),
+            builder.item_vspacer(),
+            builder.two_col_row(
+                vec![builder.radio(WhatWasHappening::Testing,
+                          "Testing",
+                          self.ui.edit.record.what,
+                          ButtonStyle::Secondary,
+                          Message::WhatChanged)],
+                vec![builder.radio(WhatWasHappening::Debugging,
+                          "Debugging",
+                          self.ui.edit.record.what,
+                          ButtonStyle::Secondary,
+                          Message::WhatChanged)],
+                ColumnAlignment::Left
+            ),
+            builder.item_vspacer(),
             builder.input(&mut self.ui.edit.description_state,
                           "Description...",
                           &self.ui.edit.record.description,
@@ -193,25 +225,26 @@ impl Application for AppUi {
             builder.item_vspacer(),
             builder.form_row(
                 builder.checkbox(self.ui.edit.record.frozen.is_some(),
-                                    "Frozen",
-                                    Message::FrozenToggled),
+                                 "Frozen",
+                                 ButtonStyle::Secondary,
+                                 Message::FrozenToggled),
                 builder.label(frozen_spent),
             ),
             builder.item_vspacer(),
             builder.form_row(
                 builder.checkbox(self.ui.edit.record.busy.is_some(),
-                                    "Busy",
-                                    Message::BusyToggled),
+                                 "Busy",
+                                 ButtonStyle::Secondary,
+                                 Message::BusyToggled),
                 builder.label(busy_spent),
             ),
             builder.item_vspacer(),
-            builder.button_row(
-                /* left */ vec![],
-                /* right */ vec![crash_button, killed_button]),
+            builder.two_col_row(vec![], vec![crash_button, killed_button], ColumnAlignment::Right),
             builder.section_vspacer(),
-            builder.button_row(
+            builder.two_col_row(
                 vec![builder.title(format!("History ({})", records_len))],
-                history_right_part),
+                history_right_part,
+                ColumnAlignment::Outward),
             builder.item_vspacer(),
             match &self.data {
                 None => {
@@ -233,7 +266,7 @@ impl Application for AppUi {
     }
 }
 
-impl AppUi {
+impl MainWindow {
 
     fn register_entry(&mut self) -> Command<UiMessage!()>
     {

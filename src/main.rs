@@ -2,13 +2,13 @@ mod record;
 mod app_data;
 mod ui;
 
-use ui::app::AppUi;
+use ui::window::MainWindow;
 
 fn main() {
-    <AppUi as iced::Application>::run(
+    <MainWindow as iced::Application>::run(
         iced::settings::Settings {
             window: iced::window::Settings {
-                size: (400, 600),
+                size: (ui::style::WINDOW_WIDTH as u32, ui::style::WINDOW_HEIGHT as u32),
                 resizable: true,
                 decorations: true,
             },

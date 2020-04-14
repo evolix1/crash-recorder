@@ -1,10 +1,10 @@
 macro_rules! UiElement {
-    () => { iced::Element<<$crate::AppUi as iced::Application>::Message> };
-    (for<$lf:lifetime>) => { iced::Element<$lf, <$crate::AppUi as iced::Application>::Message> };
+    () => { iced::Element<<$crate::MainWindow as iced::Application>::Message> };
+    (for<$lf:lifetime>) => { iced::Element<$lf, <$crate::MainWindow as iced::Application>::Message> };
 }
 
 macro_rules! UiMessage {
-    () => { <$crate::AppUi as iced::Application>::Message };
+    () => { <$crate::MainWindow as iced::Application>::Message };
 }
 
 // taken from 'iced/example/clock'
