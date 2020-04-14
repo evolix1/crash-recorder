@@ -8,7 +8,7 @@ pub const LIST_GAP: u16 = 5;
 pub const FORM_LAYOUT_LEFT_WIDTH: u16 = 120;
 
 
-#[cfg(not(platform="windows"))]
+#[cfg(not(target_os="windows"))]
 macro_rules! font {
     ($modifier:expr) => {
         Font::External {
@@ -18,7 +18,7 @@ macro_rules! font {
     }
 }
 
-#[cfg(platform="windows")]
+#[cfg(target_os="windows")]
 macro_rules! font {
     ($title:expr, $modifier:expr) => {
         Font::External {
@@ -29,7 +29,7 @@ macro_rules! font {
 }
 
 
-#[cfg(not(platform="windows"))]
+#[cfg(not(target_os="windows"))]
 const FONTS: [Font; 4] = [
     font!("Regular"),
     font!("Italic"),
@@ -38,7 +38,7 @@ const FONTS: [Font; 4] = [
 ];
 
 
-#[cfg(platform="windows")]
+#[cfg(target_os="windows")]
 const FONTS: [Font; 4] = [
     font!("Regular", ""),
     font!("Italic", "i"),
